@@ -6,12 +6,12 @@ import asyncio
 
 # Создание движка(синхронный)
 
-# sync_engine = create_engine(
-#     url=settings.DATABASE_URL_psyconf, # ссылка на БД
-#     echo=False, # Типо логирование
-#     pool_size=5, # Количество подключений
-#     max_overflow=10, # Дополнительные подключения
-# )
+sync_engine = create_engine(
+    url=settings.DATABASE_URL_psyconf, # ссылка на БД
+    echo=True, # Типо логирование
+    pool_size=5, # Количество подключений
+    max_overflow=10, # Дополнительные подключения
+)
 
 async_engine = create_async_engine(
     url=settings.DATABASE_URL_asyncpg, # ссылка на БД
@@ -19,24 +19,3 @@ async_engine = create_async_engine(
     pool_size=5, # Количество подключений
     max_overflow=10, # Дополнительные подключения
 )
-
-# # Запрос (синхронный)
-# with sync_engine.connect() as conn:
-#     # получаем версию(без text не работает)
-#     res = conn.execute(text("SELECT VERSION()"))
-#     print(f"{res.first()=}")
-
-# Запрос (асинхронный)
-async def get():
-    async with async_engine.connect() as conn:
-        # получаем версию(без text не работает)
-        res = await conn.execute(text("SELECT 1,2,3 union select 4,5,6"))
-        print(f"{res.all()=}")
-
-asyncio.run(get())
-
-# #автокоммит
-# with engine.begin() as conn:
-#     # получаем версию(без text не работает)
-#     res = conn.execute(text("SELECT VERSION()"))
-#     print(f"{res}")
