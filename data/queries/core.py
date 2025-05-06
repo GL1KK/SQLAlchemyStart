@@ -1,6 +1,6 @@
-from sqlalchemy import text
+from sqlalchemy import text, insert
 from database import async_engine, sync_engine
-from models import metadata_obj
+from models import metadata_obj, workers_table
 
 
 # Запрос (синхронный)
@@ -25,5 +25,21 @@ async def get_async_123():
 
 # Создание таблицы
 def create_table():
+    sync_engine.echo = False
     metadata_obj.drop_all(sync_engine) # удаление
+    print("Таблица удалена") 
     metadata_obj.create_all(sync_engine) # создание
+    print("Таблица создана") 
+    sync_engine.echo = True
+# Запрос на вставку(INSERT)
+def insert_data():
+    with sync_engine.connect() as conn:
+        # stmt = """INSERT INTO workers (username)  VALUES # ТАК НЕ НАДА
+        # ('Bobr'),
+        # ('Volk');"""
+        stmt = insert(workers_table).values([ # Вот так нада
+            {"username": "Bobr"},
+            {"username": "Volk"}
+        ])
+        conn.execute(stmt)
+        conn.commit() # после этого окажутся в бд
