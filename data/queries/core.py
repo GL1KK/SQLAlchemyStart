@@ -1,4 +1,4 @@
-from sqlalchemy import text, insert
+from sqlalchemy import text, insert, select, update
 from database import async_engine, sync_engine
 from models import metadata_obj, workers_table
 
@@ -24,7 +24,7 @@ async def get_async_123():
         print(f"{res.all()=}")
 
 # Создание таблицы
-def create_table():
+def create_table_core():
     sync_engine.echo = False
     metadata_obj.drop_all(sync_engine) # удаление
     print("Таблица удалена") 
@@ -32,7 +32,7 @@ def create_table():
     print("Таблица создана") 
     sync_engine.echo = True
 # Запрос на вставку(INSERT)
-def insert_data():
+def insert_data_core():
     with sync_engine.connect() as conn:
         # stmt = """INSERT INTO workers (username)  VALUES # ТАК НЕ НАДА
         # ('Bobr'),
@@ -43,3 +43,17 @@ def insert_data():
         ])
         conn.execute(stmt)
         conn.commit() # после этого окажутся в бд
+def select_workers_core():
+    with sync_engine.connect() as conn:
+        query = select(workers_table) # SELECT * FROM workers;
+        res = conn.execute(query)
+        workers = res.all()
+        print(workers)
+def update_workers_core(worker_id: int = 2, new_username: str = "Misha"):
+    with sync_engine.connect() as conn:
+        # stmt = text("UPDATE workers SET username={new_username}") # SQL иньекция так нельза!!!!
+        # stmt = text("UPDATE workers SET username=:username WHERE id=:id") # Правильно(сырой запрос)
+        # stmt = stmt.bindparams(username=new_username, id=workers_id) 
+        stmt = update(workers_table).values(username=new_username).filter_by(id=worker_id) # where/filter(workers_table.c.id==workers_id) не оч
+        conn.execute(stmt)
+        conn.commit()
