@@ -5,39 +5,49 @@ import enum
 import datetime
 from typing import Annotated
 
-# Кастомный тип
-intpk = Annotated[int, mapped_column(primary_key=True)] 
+# Кастомные типы с предустановленными настройками для столбцов
+intpk = Annotated[int, mapped_column(primary_key=True)]
 creare_at = Annotated[datetime.datetime, mapped_column(server_default=text("TIMEZONE('utc', now())"))]
 update_at = Annotated[datetime.datetime, mapped_column(server_default=text("TIMEZONE('utc', now())"), onupdate=datetime.datetime.utcnow)]
 
-# Хранение данных в декларативном стиле(мне так удобнее)
+# Хранение данных в декларативном стиле (ORM Models)
 class WorkerOrm(Base):
-    __tablename__ = "workers" # Название
-    id: Mapped[intpk] # = mapped_column(primary_key=True) # Создание столбца
-    username: Mapped[str] # = mapped_column() опоцианально
+    """
+    ORM модель для таблицы 'workers'. Представляет строку в таблице как объект Python.
+    """
+    __tablename__ = "workers" # Название таблицы в базе данных.
+    id: Mapped[intpk] # Объявляем столбец 'id' с типом 'intpk' (целое число, первичный ключ).
+    username: Mapped[str] # Объявляем столбец 'username' с типом 'str' (строка).
 
-class Workload(enum.Enum): # Создаем enum 
-    parttime = "parttime" # Обьекты enum
-    fulltime = "fulltime"
+class Workload(enum.Enum):
+    """
+    Enum (перечисление) для представления возможных вариантов занятости.
+    """
+    parttime = "parttime" # Вариант "parttime".
+    fulltime = "fulltime" # Вариант "fulltime".
 
 class ResumesOrm(Base):
-    __tablename__ = "resumes"
-    id: Mapped[intpk]
-    title: Mapped[str_256]
-    copensation: Mapped[int | None] # = mapped_column(nullable=True) Не обязательное поле. Или так или так
-    workload: Mapped[Workload] # тип данных Wokload
-    worker_id: Mapped[int] = mapped_column(ForeignKey("workers.id", ondelete="CASCADE")) # внешний ключ для связи указываем название таблицы и столбец или (WorkerOrm.id), ondelete="CASCADE" удаляет все связанное с пользователем
-    create_at: Mapped[creare_at] #= mapped_column(server_default=text("TIMEZONE('utc', now())")) # дефолтное что должно добавится в БД, func.now местное время, TIMEZONE время utc
-    update_at: Mapped[update_at] #= mapped_column(server_default=text("TIMEZONE('utc', now())"), onupdate=datetime.datetime.utcnow) # Обнавляется при изменении ТОЛЬКО С ORM
+    """
+    ORM модель для таблицы 'resumes'. Представляет строку в таблице как объект Python.
+    """
+    __tablename__ = "resumes" # Название таблицы в базе данных.
+    id: Mapped[intpk] # Объявляем столбец 'id' с типом 'intpk' (целое число, первичный ключ).
+    title: Mapped[str_256] # Объявляем столбец 'title' с типом 'str_256' (строка с ограничением длины 256).
+    compensation: Mapped[int | None] # Объявляем столбец 'compensation' с типом 'int' или None (может быть NULL в базе).
+    workload: Mapped[Workload] # Объявляем столбец 'workload' с типом 'Workload' (наш enum).
+    worker_id: Mapped[int] = mapped_column(ForeignKey("workers.id", ondelete="CASCADE")) # Объявляем столбец 'worker_id' как внешний ключ, ссылающийся на столбец 'id' таблицы 'workers'.
+                                                                                     # 'ondelete="CASCADE"' означает, что при удалении записи из 'workers', все связанные записи в 'resumes' также будут удалены.
+    create_at: Mapped[creare_at] # Объявляем столбец 'create_at' с типом 'creare_at' (datetime с дефолтным значением - текущее UTC время на сервере БД).
+    update_at: Mapped[update_at] # Объявляем столбец 'update_at' с типом 'update_at' (datetime с дефолтным значением - текущее UTC время на сервере БД, обновляется на текущее UTC время при изменении записи ORM).
 
 
-# Хранение всех данных в императивном стиле
-metadata_obj = MetaData()
+# Хранение всех данных в императивном стиле (Core API)
+metadata_obj = MetaData() # Создаем объект MetaData для хранения информации о схеме базы данных.
 
-# Обьявление таблицы
+# Объявление таблицы 'workers' в императивном стиле
 workers_table = Table(
-    "workers", # Название
-    metadata_obj, # данные
-    Column("id", Integer, primary_key=True), # Создание столбца 1 - имя, 2 - тип данных, 3 - первичный ключ
-    Column("username", String) 
+    "workers", # Название таблицы.
+    metadata_obj, # Связываем таблицу с нашим объектом MetaData.
+    Column("id", Integer, primary_key=True), # Определяем столбец 'id': имя - "id", тип данных - Integer, является первичным ключом.
+    Column("username", String) # Определяем столбец 'username': имя - "username", тип данных - String (текст).
 )
