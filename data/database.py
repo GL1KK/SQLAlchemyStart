@@ -47,3 +47,15 @@ class Base(DeclarativeBase):
         str_256: String(256) # Указываем SQLAlchemy, что когда встречается аннотация типа 'str_256',
                              # соответствующий столбец в базе данных должен быть типа String с длиной 256.
     }
+    # def __repr__(self):
+    #     cols = [{f"{col}={getattr(self, col)}" for col in self.__table__.columns.keys()}]
+    #     return f"<{self.__class__.__name__} {','.join(str(i) for i in cols)}>" 
+
+    repr_cols_nums = 3
+    repr_cols = tuple()
+    def __repr__(self):
+        cols = []
+        for idx, col in enumerate(self.__table__.columns.keys()):
+            if col in self.repr_cols or idx < self.repr_cols_nums:
+                cols.append(f"{col}={getattr(self, col)}")
+        return f"<{self.__class__.__name__} {','.join(str(i) for i in cols)}>" 

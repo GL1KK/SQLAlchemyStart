@@ -1,5 +1,5 @@
 from sqlalchemy import text, insert, select, func, cast, Integer, and_
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import aliased, joinedload, selectinload
 from database import sync_engine, async_engine, sync_session_factory, async_session_factory, Base
 from models import metadata_obj, WorkerOrm, ResumesOrm, Workload
 import datetime
@@ -23,12 +23,12 @@ def insert_table_orm():
     """
     with sync_session_factory() as session: # Создаем контекстный менеджер для синхронной сессии. Сессия автоматически закроется после выполнения блока.
         # Создаем экземпляры модели WorkerOrm для добавления работников.
-        worker_bobr = WorkerOrm(username="Bobr")
-        worker_volk = WorkerOrm(username="Volk")
-        worker_lisa = WorkerOrm(username="Lisa")
-        worker_misa = WorkerOrm(username="Misa")
-        worker_light = WorkerOrm(username="Light")
-        worker_sany = WorkerOrm(username="Sany")
+        worker_bobr = WorkerOrm(username="Bobr", lastname="Kurwa", phone_number=790)
+        worker_volk = WorkerOrm(username="Volk", lastname="Makaka", phone_number=890)
+        worker_lisa = WorkerOrm(username="Lisa", lastname="Joinova", phone_number=659)
+        worker_misa = WorkerOrm(username="Misa", lastname="Light", phone_number=795)
+        worker_light = WorkerOrm(username="Light", lastname="Misa", phone_number=790)
+        worker_sany = WorkerOrm(username="Sany", lastname="Lala", phone_number=123)
         # Добавляем все созданные экземпляры работников в сессию.
         session.add_all([worker_bobr, worker_volk, worker_lisa, worker_misa, worker_light, worker_sany])
         session.commit() # Фиксируем транзакцию, отправляя данные в базу данных.
@@ -118,6 +118,147 @@ def select_resumes_avg_compensation(like_language: str = "Python"):
         res = session.execute(query) # Выполняем SQL-запрос и получаем результат.
         result = res.all() # Извлекаем все строки результата. Каждая строка будет содержать 'workload' и 'avg_compensation'.
         print(result) # Выводим полученный результат.
+def select_workers_with_lazy_relationship():
+    """
+    Эта функция демонстрирует ленивую (lazy) загрузку связанных данных.
+
+    **Отношение "один ко многим" (One-to-Many):**
+    В данном примере `WorkerOrm` имеет отношение "один ко многим" с `ResumesOrm`
+    (один работник может иметь много резюме). Связь определена в `WorkerOrm`
+    через `relationship("ResumesOrm", back_populates="worker")` и в `ResumesOrm`
+    через `relationship("WorkerOrm", back_populates="resumes")` и `ForeignKey("workers.id")`.
+
+    При ленивой загрузке, когда вы запрашиваете `WorkerOrm`, связанные `ResumesOrm`
+    не загружаются немедленно. Они будут загружены отдельным SQL-запросом
+    только при первом обращении к атрибуту `resumes` объекта `WorkerOrm`.
+
+    **Подходит для:**
+    - Случаев, когда связанные данные нужны не всегда.
+    - Экономии ресурсов при выборке большого количества основных сущностей,
+      если связанные данные нужны лишь для небольшой их части.
+    - Может привести к проблемам производительности ("N+1 запрос"), если вам
+      нужно получить связанные данные для большого количества основных сущностей.
+    """
+    with sync_session_factory() as session: # Создаем сессию для взаимодействия с базой данных.
+        query = (
+            select(WorkerOrm) # Создаем запрос на выборку всех работников из таблицы 'workers'.
+        )
+
+        res = session.execute(query) # Выполняем запрос на выборку работников и получаем объект Result.
+        result = res.scalars().all() # Извлекаем все объекты WorkerOrm из объекта Result в виде списка.
+
+        # На данный момент связанные резюме (отношение 'resumes') для каждого работника
+        # еще НЕ загружены из базы данных. SQLAlchemy знает о связи, но данные не подгружены.
+
+        worker_1_resumes = result[0].resumes # Вот здесь, при первом обращении к атрибуту 'resumes' первого работника,
+                                             # SQLAlchemy автоматически выполнит дополнительный SQL-запрос
+                                             # (если сессия еще активна и данные не были загружены ранее)
+                                             # чтобы загрузить все связанные с этим работником резюме.
+
+        print(f"{worker_1_resumes}") # Выводим список объектов ResumesOrm, связанных с первым работником.
+
+        worker_2_resumes = result[1].resumes # Аналогично, при первом обращении к атрибуту 'resumes' второго работника,
+                                             # будет выполнен еще один отдельный SQL-запрос для загрузки его резюме.
+
+        print(f"{worker_2_resumes}") # Выводим список объектов ResumesOrm, связанных со вторым работником.
+
+def select_workers_with_joined_relationship():
+    """
+    Эта функция демонстрирует жадную (eager) загрузку связанных данных с помощью joinedload.
+
+    **Отношение "один ко многим" (One-to-Many):**
+    Как и в ленивой загрузке, здесь также рассматривается отношение "один ко многим"
+    между `WorkerOrm` и `ResumesOrm`.
+
+    При использовании `joinedload(WorkerOrm.resumes)`, SQLAlchemy выполнит один SQL-запрос
+    с использованием `JOIN` (обычно `LEFT OUTER JOIN`) для загрузки как информации о работниках,
+    так и всех их связанных резюме. Когда вы обращаетесь к атрибуту `resumes` объекта `WorkerOrm`,
+    данные уже будут доступны в памяти, и дополнительный запрос не потребуется.
+
+    **Подходит для:**
+    - Случаев, когда вам часто нужны связанные данные вместе с основной сущностью.
+    - Предотвращения проблемы "N+1 запрос" и повышения производительности,
+      когда вы обрабатываете большое количество основных сущностей и их связей.
+    - Может привести к избыточной загрузке данных, если связанные данные нужны не для всех
+      обрабатываемых основных сущностей.
+      Подходит для one to one(o2o(один к одному)) и many to one(m2o(многие к одному))
+    """
+    with sync_session_factory() as session: # Создаем сессию для взаимодействия с базой данных.
+        query = (
+            select(WorkerOrm) # Создаем запрос на выборку всех работников из таблицы 'workers'.
+            .options(joinedload(WorkerOrm.resumes)) # Указываем SQLAlchemy, что отношение 'resumes' должно быть загружено
+                                                   # "жадно" (eagerly) с использованием `JOIN`.
+        )
+
+        res = session.execute(query) # Выполняем запрос. SQLAlchemy уже загрузил связанные резюме.
+        result = res.unique().scalars().all() # Извлекаем уникальные объекты WorkerOrm из результата запроса.
+                                             # `.unique()` используется здесь, чтобы избежать дублирования объектов WorkerOrm
+                                             # в случае, если у одного работника несколько резюме (из-за JOIN).
+
+        # На данный момент связанные резюме (отношение 'resumes') для каждого работника
+        # УЖЕ загружены из базы данных вместе с информацией о работниках.
+
+        worker_1_resumes = result[0].resumes # Доступ к атрибуту 'resumes' первого работника не требует
+                                             # выполнения дополнительного SQL-запроса, так как данные уже загружены.
+
+        print(f"{worker_1_resumes}") # Выводим список объектов ResumesOrm, связанных с первым работником.
+
+        worker_2_resumes = result[1].resumes # Аналогично, доступ к атрибуту 'resumes' второго работника также не вызывает
+                                             # дополнительного обращения к базе данных.
+
+        print(f"{worker_2_resumes}") # Выводим список объектов ResumesOrm, связанных со вторым работником.
+
+def select_workers_with_selectin_relationship():
+    """
+    Эта функция демонстрирует жадную (eager) загрузку связанных данных с помощью selectinload.
+
+    **Отношение "один ко многим" (One-to-Many):**
+    Как и в предыдущих примерах, здесь также рассматривается отношение "один ко многим"
+    между `WorkerOrm` и `ResumesOrm`.
+
+    При использовании `selectinload(WorkerOrm.resumes)`, SQLAlchemy сначала выполняет
+    один запрос для получения всех объектов `WorkerOrm`. Затем, SQLAlchemy выполняет
+    отдельный SQL-запрос (используя оператор `IN`) для получения всех связанных
+    объектов `ResumesOrm` для всех загруженных `WorkerOrm` за один раз.
+
+    **Подходит для:**
+    - Предотвращения проблемы "N+1 запрос" с потенциально лучшей производительностью,
+      чем `joinedload` в случаях, когда количество связанных записей велико,
+      или когда стратегия `JOIN` может быть неоптимальной.
+    - Может быть более эффективным, чем `joinedload` для больших коллекций связанных объектов,
+      так как позволяет базе данных лучше оптимизировать запрос с `IN`.
+
+    **Как работает:**
+    1. Выбираются все работники (`SELECT * FROM workers`).
+    2. Собираются ID всех полученных работников.
+    3. Выполняется второй запрос (`SELECT * FROM resumes WHERE resumes.worker_id IN (:worker_ids)`),
+       где `:worker_ids` - это список ID всех полученных работников.
+    4. SQLAlchemy затем сопоставляет полученные резюме с соответствующими работниками в памяти.
+    Подходит для one to many(o2m(один ко многим)) и many to many(m2m(многие ко многим))
+    """
+    with sync_session_factory() as session: # Создаем сессию для взаимодействия с базой данных.
+        query = (
+            select(WorkerOrm) # Создаем запрос на выборку всех работников из таблицы 'workers'.
+            .options(selectinload(WorkerOrm.resumes)) # Указываем SQLAlchemy, что отношение 'resumes' должно быть загружено
+                                                     # "жадно" (eagerly) с использованием `SELECT IN`.
+        )
+
+        res = session.execute(query) # Выполняем запрос на выборку работников.
+        result = res.unique().scalars().all() # Извлекаем уникальные объекты WorkerOrm из результата запроса.
+
+        # На данный момент связанные резюме (отношение 'resumes') для всех работников
+        # УЖЕ загружены в память с помощью отдельного запроса с оператором IN.
+
+        worker_1_resumes = result[0].resumes # Доступ к атрибуту 'resumes' первого работника не требует
+                                             # дополнительного SQL-запроса, так как данные уже загружены.
+
+        print(f"{worker_1_resumes}") # Выводим список объектов ResumesOrm, связанных с первым работником.
+
+        worker_2_resumes = result[1].resumes # Аналогично, доступ к атрибуту 'resumes' второго работника также не вызывает
+                                             # дополнительного обращения к базе данных.
+
+        print(f"{worker_2_resumes}") # Выводим список объектов
+
 
 async def join_cte_subquery_window_func(like_language: str = "Python"):
     """
