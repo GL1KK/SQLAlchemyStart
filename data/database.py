@@ -51,11 +51,27 @@ class Base(DeclarativeBase):
     #     cols = [{f"{col}={getattr(self, col)}" for col in self.__table__.columns.keys()}]
     #     return f"<{self.__class__.__name__} {','.join(str(i) for i in cols)}>" 
 
-    repr_cols_nums = 3
-    repr_cols = tuple()
     def __repr__(self):
-        cols = []
+        """
+        Переопределяет стандартное строковое представление объекта,
+        которое используется при вызове print() для объекта или при его отображении в отладчике.
+        Это помогает сделать отладку и логирование более информативными,
+        показывая ключевые поля объекта.
+        """
+        cols = [] # Создаем пустой список для хранения строковых представлений столбцов.
+        # Итерируем по всем столбцам таблицы, к которой привязана эта ORM-модель.
+        # `self.__table__.columns.keys()` возвращает список имен столбцов.
         for idx, col in enumerate(self.__table__.columns.keys()):
+            # Проверяем, должен ли столбец быть включен в repr:
+            # 1. Если имя столбца явно указано в `self.repr_cols` ИЛИ
+            # 2. Если индекс столбца меньше `self.repr_cols_nums` (то есть, это один из первых N столбцов).
             if col in self.repr_cols or idx < self.repr_cols_nums:
+                # Если условие выполняется, форматируем строку в виде "имя_столбца=значение_столбца"
+                # `getattr(self, col)` динамически получает значение атрибута (столбца) по его имени.
                 cols.append(f"{col}={getattr(self, col)}")
-        return f"<{self.__class__.__name__} {','.join(str(i) for i in cols)}>" 
+        # Формируем финальную строку repr.
+        # - `<{self.__class__.__name__}`: Начинаем с имени класса (например, "<WorkerOrm").
+        # - `{','.join(str(i) for i in cols)}`: Объединяем все отформатированные строки столбцов
+        #   в одну строку, разделяя их запятыми.
+        # - `>`: Закрываем угловую скобку.
+        return f"<{self.__class__.__name__} {','.join(str(i) for i in cols)}>"

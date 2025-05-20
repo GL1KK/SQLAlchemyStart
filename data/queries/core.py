@@ -2,23 +2,6 @@ from sqlalchemy import text, insert, select, update
 from database import async_engine, sync_engine
 from models import metadata_obj, workers_table
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, insert, select, update, text
-# from sqlalchemy.ext.asyncio import create_async_engine # Импорт для асинхронного движка (может потребоваться установка aiosqlite или другой асинхронной библиотеки)
-
-# Определяем объект MetaData, который будет содержать информацию о нашей базе данных (таблицах и т.д.)
-metadata_obj = MetaData()
-
-# Определяем таблицу 'workers' с помощью Core API
-workers_table = Table(
-    "workers", # Имя таблицы
-    metadata_obj, # Связываем с нашим объектом MetaData
-    Column("id", Integer, primary_key=True), # Определяем столбец 'id' как целое число и первичный ключ
-    Column("username", String), # Определяем столбец 'username' как строку
-)
-
-# Строка подключения к базе данных (замените на вашу строку подключения)
-DATABASE_URL = "sqlite:///:memory:" # Пример для SQLite в памяти
-sync_engine = create_engine(DATABASE_URL, echo=False) # Создаем синхронный движок для подключения к базе данных. echo=False отключает вывод SQL.
-# async_engine = create_async_engine(DATABASE_URL) # Создаем асинхронный движок (если используется асинхронная библиотека).
 
 # Запрос (синхронный)
 def get_sync_vers():
