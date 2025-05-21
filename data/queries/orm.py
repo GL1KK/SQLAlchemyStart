@@ -1,8 +1,9 @@
 from sqlalchemy import text, insert, select, func, cast, Integer, and_
 from sqlalchemy.orm import aliased, joinedload, selectinload, contains_eager
-from database import sync_engine, async_engine, sync_session_factory, async_session_factory, Base
-from models import metadata_obj, WorkerOrm, ResumesOrm, Workload
-import datetime
+from ..database import sync_engine, async_engine, sync_session_factory, async_session_factory, Base
+from ..models import metadata_obj, WorkerOrm, ResumesOrm, Workload
+from datetime import datetime
+from ..schemas import *
 # Функция для создания таблиц в базе данных
 def create_table_orm():
     """
@@ -35,17 +36,17 @@ def insert_table_orm():
         # Создаем экземпляры модели ResumesOrm для добавления резюме.
         # Связываем каждое резюме с соответствующим работником по его ID (worker_id).
         resumes_bobr = ResumesOrm(title="Bobr.... Python", compensation=100000,
-            workload=Workload.fulltime, worker_id=worker_bobr.id, create_at=datetime.datetime.utcnow(), update_at=datetime.datetime.utcnow())
+            workload=Workload.fulltime, worker_id=worker_bobr.id, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
         resumes_volk = ResumesOrm(title="Volk.... Python", compensation=150000,
-            workload=Workload.parttime, worker_id=worker_volk.id, create_at=datetime.datetime.utcnow(), update_at=datetime.datetime.utcnow())
+            workload=Workload.parttime, worker_id=worker_volk.id, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
         resumes_lisa = ResumesOrm(title="lisa.... python", compensation=200000,
-            workload=Workload.parttime, worker_id=worker_lisa.id, create_at=datetime.datetime.utcnow(), update_at=datetime.datetime.utcnow())
+            workload=Workload.parttime, worker_id=worker_lisa.id, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
         resumes_misa = ResumesOrm(title="Misa.... Python", compensation=225000,
-            workload=Workload.fulltime, worker_id=worker_misa.id, create_at=datetime.datetime.utcnow(), update_at=datetime.datetime.utcnow())
+            workload=Workload.fulltime, worker_id=worker_misa.id, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
         resumes_light = ResumesOrm(title="Lihht.... Python", compensation=50000,
-            workload=Workload.fulltime, worker_id=worker_light.id, create_at=datetime.datetime.utcnow(), update_at=datetime.datetime.utcnow())
+            workload=Workload.fulltime, worker_id=worker_light.id, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
         resumes_sany = ResumesOrm(title="Sany.... python", compensation=230000,
-            workload=Workload.parttime, worker_id=worker_sany.id, create_at=datetime.datetime.utcnow(), update_at=datetime.datetime.utcnow())
+            workload=Workload.parttime, worker_id=worker_sany.id, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
         # session.add(worker_bobr) # Отправка отдельного объекта в сессию (уже сделано через add_all выше).
         # session.add(worker_volk) или... (уже сделано через add_all выше).
         # Добавляем все созданные экземпляры резюме в сессию.
@@ -462,3 +463,52 @@ async def join_cte_subquery_window_func(like_language: str = "Python"):
         # compile_kwargs={"literal_binds": True} заставляет SQLAlchemy вставлять фактические значения
         # вместо параметров-заполнителей, что облегчает чтение сгенерированного SQL.
         # print(query.compile(compile_kwargs={"literal_binds": True}))
+
+def Pydantic_DTO_only_select():
+    with sync_session_factory() as session:
+        query = (
+            select(WorkerOrm)
+        )
+        res = session.execute(query)
+        result_orm = res.scalars().all()
+        print(f"{result_orm=}")
+        result_dto = [WorkersDTO.model_validate(row, from_attributes=True) for row in result_orm]
+        print(f"{result_dto=}")
+
+def Pydantic_DTO_relationship():
+     with sync_session_factory() as session:
+        query = (
+            select(WorkerOrm)
+            .options(selectinload(WorkerOrm.resumes))
+            .limit(2)
+        )
+        res = session.execute(query)
+        result_orm = res.scalars().all()
+        print(f"{result_orm=}")
+        result_dto = [WorkersRelDTO.model_validate(row, from_attributes=True) for row in result_orm]
+        print(f"{result_dto=}")
+        return result_dto
+
+def Pydantic_DTO_join():
+      with sync_session_factory() as session: # Создаем контекстный менеджер для синхронной сессии.
+        query = (
+            select(
+                ResumesOrm.workload, # Получаем столбец 'workload' (тип занятости: fulltime/parttime).
+                cast(func.avg(ResumesOrm.compensation), Integer).label("avg_compensation"), # Вычисляем среднюю компенсацию и приводим к целому числу, даем псевдоним 'avg_compensation'.
+            )
+            .filter(
+                and_(
+                    ResumesOrm.title.contains("Python"), # Фильтруем резюме, где в заголовке встречается указанный язык (like_language). Оператор 'contains' эквивалентен SQL LIKE %value%.
+                    ResumesOrm.compensation > 40000 # Дополнительно фильтруем резюме с компенсацией больше 40000.
+                ) # 'and_' используется для объединения нескольких условий фильтрации с логическим "И".
+            ) # 'filter' применяет условия отбора к запросу.
+            .group_by(ResumesOrm.workload) # Группируем результаты по столбцу 'workload', чтобы вычислить среднюю зарплату для каждой группы (fulltime и parttime).
+            .having(cast(func.avg(ResumesOrm.compensation), Integer) > 70000) # Применяем фильтр к сгруппированным результатам. Оставляем только те группы, где средняя зарплата больше 70000.
+        )
+        print(query.compile(compile_kwargs={"literal_binds": True})) # Печатаем скомпилированный SQL-запрос с подставленными значениями для лучшего понимания.
+        res = session.execute(query) # Выполняем SQL-запрос и получаем результат.
+        result_orm = res.all() # Извлекаем все строки результата. Каждая строка будет содержать 'workload' и 'avg_compensation'.
+        print(f"{result_orm=}")
+        result_dto = [WorkloadAvgCompensationDTO.model_validate(row, from_attributes=True) for row in result_orm]
+        print(f"{result_dto=}")
+        return result_dto

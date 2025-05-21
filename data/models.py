@@ -1,14 +1,14 @@
 from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey, func, text, CheckConstraint, Index, PrimaryKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from database import Base, str_256
+from .database import Base, str_256
 import enum
-import datetime
+from datetime import datetime
 from typing import Annotated
 
 # Кастомные типы с предустановленными настройками для столбцов
 intpk = Annotated[int, mapped_column(primary_key=True)]
-creare_at = Annotated[datetime.datetime, mapped_column(server_default=text("TIMEZONE('utc', now())"))]
-update_at = Annotated[datetime.datetime, mapped_column(server_default=text("TIMEZONE('utc', now())"), onupdate=datetime.datetime.utcnow)]
+creared_at = Annotated[datetime, mapped_column(server_default=text("TIMEZONE('utc', now())"))]
+updated_at = Annotated[datetime, mapped_column(server_default=text("TIMEZONE('utc', now())"), onupdate=datetime.utcnow)]
 
 # Хранение данных в декларативном стиле (ORM Models)
 class WorkerOrm(Base):
@@ -90,8 +90,8 @@ class ResumesOrm(Base):
     workload: Mapped[Workload] # Объявляем столбец 'workload' с типом 'Workload' (наш enum).
     worker_id: Mapped[int] = mapped_column(ForeignKey("workers.id", ondelete="CASCADE")) # Объявляем столбец 'worker_id' как внешний ключ, ссылающийся на столбец 'id' таблицы 'workers'.
                                                                                      # 'ondelete="CASCADE"' означает, что при удалении записи из 'workers', все связанные записи в 'resumes' также будут удалены.
-    create_at: Mapped[creare_at] # Объявляем столбец 'create_at' с типом 'creare_at' (datetime с дефолтным значением - текущее UTC время на сервере БД).
-    update_at: Mapped[update_at] # Объявляем столбец 'update_at' с типом 'update_at' (datetime с дефолтным значением - текущее UTC время на сервере БД, обновляется на текущее UTC время при изменении записи ORM).
+    created_at: Mapped[creared_at] # Объявляем столбец 'create_at' с типом 'creare_at' (datetime с дефолтным значением - текущее UTC время на сервере БД).
+    updated_at: Mapped[updated_at] # Объявляем столбец 'update_at' с типом 'update_at' (datetime с дефолтным значением - текущее UTC время на сервере БД, обновляется на текущее UTC время при изменении записи ORM).
 
     worker: Mapped["WorkerOrm"] = relationship(back_populates="resumes")
     # Это определение отношения "многие к одному" (Many-to-One).

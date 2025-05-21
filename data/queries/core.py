@@ -1,6 +1,6 @@
 from sqlalchemy import text, insert, select, update
-from database import async_engine, sync_engine
-from models import metadata_obj, workers_table
+from ..database import async_engine, sync_engine
+from ..models import metadata_obj, workers_table
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, insert, select, update, text
 
 # Запрос (синхронный)
