@@ -1,7 +1,7 @@
 from sqlalchemy import text, insert, select, func, cast, Integer, and_
 from sqlalchemy.orm import aliased, joinedload, selectinload, contains_eager
 from ..database import sync_engine, async_engine, sync_session_factory, async_session_factory, Base
-from ..models import metadata_obj, WorkerOrm, ResumesOrm, Workload
+from ..models import metadata_obj, WorkerOrm, ResumesOrm, Workload, VacanciesOrm, VacanciesReplioceOrm
 from datetime import datetime
 from ..schemas import *
 # Функция для создания таблиц в базе данных
@@ -512,3 +512,80 @@ def Pydantic_DTO_join():
         result_dto = [WorkloadAvgCompensationDTO.model_validate(row, from_attributes=True) for row in result_orm]
         print(f"{result_dto=}")
         return result_dto
+      
+def add_vacansies_and_replice():
+    """
+    Эта функция демонстрирует создание новой вакансии и связывание её с
+    существующими резюме через отношение "многие ко многим".
+    Она имитирует ситуацию, когда резюме "откликаются" на вакансию.
+    """
+    with sync_session_factory() as session: # Открываем синхронную сессию для взаимодействия с БД.
+        # Создаем новый объект вакансии.
+        new_vacany = VacanciesOrm(title="Python Developer", compensation=100000)
+
+        # Получаем существующие резюме по их ID.
+        # Это необходимо, чтобы установить связь с уже имеющимися объектами в БД.
+        resume_1 = session.get(ResumesOrm, 1) # Получаем резюме с ID = 1.
+        resume_2 = session.get(ResumesOrm, 2) # Получаем резюме с ID = 2.
+
+        # Если резюме были найдены, добавляем новую вакансию в их коллекцию 'vacancies_replied'.
+        # SQLAlchemy автоматически управляет связыванием через промежуточную таблицу для отношения "многие ко многим".
+        if resume_1: # Проверяем, что резюме с ID 1 существует.
+            resume_1.vacancies_replied.append(new_vacany) # Добавляем новую вакансию к резюме 1.
+        else:
+            print("Резюме с ID 1 не найдено.")
+
+        if resume_2: # Проверяем, что резюме с ID 2 существует.
+            resume_2.vacancies_replied.append(new_vacany) # Добавляем новую вакансию к резюме 2.
+        else:
+            print("Резюме с ID 2 не найдено.")
+
+        session.commit() # Фиксируем изменения в базе данных.
+                         # Это сохранит новую вакансию и обновит связи "многие ко многим".
+        print("Новая вакансия добавлена и связана с резюме.")
+
+
+def select_resumes_with_all_relationships():
+    """
+    Эта функция демонстрирует продвинутую жадную загрузку связанных данных
+    для объекта 'ResumesOrm', включая:
+    - `joinedload` для отношения "многие к одному" (Many-to-One) с 'WorkerOrm'.
+    - `selectinload` для отношения "многие ко многим" (Many-to-Many) с 'VacanciesOrm',
+      с использованием `load_only` для частичной загрузки столбцов из 'VacanciesOrm'.
+
+    Подходит для ситуаций, когда вам нужны все связанные данные сразу,
+    и вы хотите оптимизировать количество SQL-запросов.
+    """
+    with sync_session_factory() as session: # Открываем синхронную сессию для взаимодействия с БД.
+        query = (
+            select(ResumesOrm) # Создаем запрос на выборку всех резюме.
+            # 1. Жадная загрузка Worker (отношение Many-to-One):
+            # `joinedload(ResumesOrm.worker)` выполнит JOIN с таблицей 'workers'
+            # в основном SQL-запросе, чтобы загрузить данные работника вместе с резюме.
+            # Это позволяет избежать "N+1" проблемы для 'worker', так как данные уже есть.
+            .options(joinedload(ResumesOrm.worker))
+
+            # 2. Жадная загрузка связанных Vacancies (отношение Many-to-Many) с частичной загрузкой:
+            # `selectinload(ResumesOrm.vacancies_replied)` выполнит второй SQL-запрос
+            # (после основного запроса на резюме) с использованием оператора `IN` для
+            # загрузки всех связанных вакансий.
+            # `.load_only(VacanciesOrm.title)` - это важная оптимизация:
+            # она указывает SQLAlchemy загружать ТОЛЬКО столбец 'title' из таблицы 'vacancies'
+            # для связанных объектов 'VacanciesOrm'. Это уменьшает объем данных,
+            # передаваемых по сети, если вам не нужны все столбцы вакансии.
+            .options(selectinload(ResumesOrm.vacancies_replied).load_only(VacanciesOrm.title))
+        )
+        res = session.execute(query) # Выполняем SQL-запрос(ы).
+        # `unique()` используется, чтобы избежать дублирования объектов ResumesOrm,
+        # если JOIN с VacanciesOrm приводит к повторениям (например, если у резюме много откликов).
+        # `scalars().all()` извлекает все уникальные объекты ResumesOrm.
+        result_orm = res.unique().scalars().all()
+        print(f"{result_orm=}") # Выводим список полученных объектов ResumesOrm (включая загруженные отношения).
+
+        # Преобразуем полученные ORM-объекты в DTO (Data Transfer Objects) с помощью Pydantic.
+        # `from_attributes=True` позволяет Pydantic читать данные напрямую из атрибутов ORM-объекта,
+        # включая связанные объекты и коллекции.
+        result_dto = [ResumesRelVacanciesReokiedDTO.model_validate(row, from_attributes=True) for row in result_orm]
+        print(f"{result_dto}") # Выводим список DTO.
+
+        return result_dto # Возвращаем список DTO для дальнейшего использования.

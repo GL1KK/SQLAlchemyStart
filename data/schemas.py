@@ -31,3 +31,14 @@ class WorkloadAvgCompensationDTO(BaseModel):
     workload: Workload
     avg_compensation: int
 # DTO - Data Transfer Object(Просто передача данных)
+
+class VacanciesAddDTO(BaseModel):
+    title: str
+    compensation: int | None
+
+class VacanciesDTO(VacanciesAddDTO):
+    id: int
+
+class ResumesRelVacanciesReokiedDTO(ResumesDTO):
+    worker: "WorkersDTO"
+    vacancies_replied: list["VacanciesDTO"]

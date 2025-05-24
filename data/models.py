@@ -120,7 +120,13 @@ class ResumesOrm(Base):
     #     обновляет соответствующий список `worker_obj.resumes` и наоборот,
     #     обеспечивая согласованность данных в обоих направлениях.
 
-    repr_cols_nums = 4
+    vacancies_replied: Mapped[list["VacanciesOrm"]] = relationship(
+        back_populates="resumes_replied",
+        secondary="vacancies_replice",
+    )
+
+
+    repr_cols_nums = 9
     repr_cols = ("create_at")
 
     __table_args__ = (
@@ -163,7 +169,31 @@ class ResumesOrm(Base):
         # вставку недействительных или некорректных данных в таблицу.
     )
 
+class VacanciesOrm(Base):
+    __tablename__ = "vacancies"
 
+    id: Mapped[intpk]
+    title: Mapped[str_256]
+    compensation: Mapped[int | None]
+
+    resumes_replied: Mapped[list["ResumesOrm"]] = relationship(
+        back_populates="vacancies_replied",
+        secondary="vacancies_replice",
+    )
+
+class VacanciesReplioceOrm(Base):
+    __tablename__ = "vacancies_replice"
+
+    resume_id: Mapped[int] = mapped_column(
+        ForeignKey("resumes.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    vacancy_id: Mapped[int] = mapped_column(
+        ForeignKey("vacancies.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    cover_letter: Mapped[str | None]
 
 
 # Хранение всех данных в императивном стиле (Core API)
