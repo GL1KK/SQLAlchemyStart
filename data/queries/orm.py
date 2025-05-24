@@ -1,9 +1,9 @@
 from sqlalchemy import text, insert, select, func, cast, Integer, and_
 from sqlalchemy.orm import aliased, joinedload, selectinload, contains_eager
-from ..database import sync_engine, async_engine, sync_session_factory, async_session_factory, Base
-from ..models import metadata_obj, WorkerOrm, ResumesOrm, Workload, VacanciesOrm, VacanciesReplioceOrm
+from database import sync_engine, async_engine, sync_session_factory, async_session_factory, Base
+from models import metadata_obj, WorkerOrm, ResumesOrm, Workload, VacanciesOrm, VacanciesReplioceOrm
 from datetime import datetime
-from ..schemas import *
+from schemas import *
 # Функция для создания таблиц в базе данных
 def create_table_orm():
     """

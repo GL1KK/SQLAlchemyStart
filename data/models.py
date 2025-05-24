@@ -1,6 +1,6 @@
 from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey, func, text, CheckConstraint, Index, PrimaryKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from .database import Base, str_256
+from database import Base, str_256
 import enum
 from datetime import datetime
 from typing import Annotated
